@@ -1,5 +1,5 @@
 python-telegram-bot==22.3
 requests==2.32.4
 rembg[cpu]==2.0.77
-Pillow==11.3.0
+Pillow==12.3.0
 python-dotenv==1.1.1
