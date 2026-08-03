@@ -48,3 +48,36 @@ bot.onText(/\/start/, async (msg) => {
     );
 
 });
+
+bot.on("message", async (msg) => {
+
+    if (!msg.text) return;
+
+    if (msg.text.startsWith("/")) return;
+
+    const chatId = msg.chat.id;
+
+    const link = msg.text.trim();
+
+    if (!link.startsWith("http://") && !link.startsWith("https://")) {
+
+        return bot.sendMessage(
+
+            chatId,
+
+            "❌ Envie um link válido de uma imagem."
+
+        );
+
+    }
+
+    await bot.sendMessage(
+
+        chatId,
+
+        "✅ Link recebido!\n\n" +
+        "🔗 " + link
+
+    );
+
+});
