@@ -31,3 +31,20 @@ app.listen(PORT, () => {
 console.log("========================================");
 console.log("🤖 REMOVE BG BOT INICIADO");
 console.log("========================================");
+
+bot.onText(/\/start/, async (msg) => {
+
+    await bot.sendMessage(
+
+        msg.chat.id,
+
+        "👋 Olá!\n\n" +
+        "Envie o link direto de uma imagem.\n\n" +
+        "Eu vou:\n" +
+        "✅ Baixar a imagem\n" +
+        "✅ Remover o fundo\n" +
+        "✅ Enviar a imagem em PNG."
+
+    );
+
+});
