@@ -3,6 +3,7 @@ require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const express = require("express");
+const FormData = require("form-data");
 
 const app = express();
 
@@ -77,13 +78,30 @@ bot.on("message", async (msg) => {
         responseType: "arraybuffer"
     });
 
-    await bot.sendPhoto(
-        chatId,
-        Buffer.from(resposta.data),
-        {
-            caption: "✅ Consegui baixar a imagem pelo link!"
-        }
-    );
+    const formData = new FormData();
+
+formData.append(
+    "file",
+    Buffer.from(resposta.data),
+    "imagem.png"
+);
+
+const removeBg = await axios.post(
+    process.env.REMOVE_BG_API,
+    formData,
+    {
+        headers: formData.getHeaders(),
+        responseType: "arraybuffer"
+    }
+);
+
+await bot.sendPhoto(
+    chatId,
+    Buffer.from(removeBg.data),
+    {
+        caption: "✅ Fundo removido com sucesso!"
+    }
+);
 
 } catch (erro) {
 
