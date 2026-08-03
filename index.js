@@ -105,7 +105,8 @@ await bot.sendPhoto(
 
 } catch (erro) {
 
-    console.error(erro);
+    console.error("ERRO COMPLETO:");
+console.error(erro.response?.data || erro.message || erro);
 
     await bot.sendMessage(
         chatId,
