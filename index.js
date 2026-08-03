@@ -71,13 +71,29 @@ bot.on("message", async (msg) => {
 
     }
 
-    await bot.sendMessage(
+    try {
 
+    const resposta = await axios.get(link, {
+        responseType: "arraybuffer"
+    });
+
+    await bot.sendPhoto(
         chatId,
-
-        "✅ Link recebido!\n\n" +
-        "🔗 " + link
-
+        Buffer.from(resposta.data),
+        {
+            caption: "✅ Consegui baixar a imagem pelo link!"
+        }
     );
 
-});
+} catch (erro) {
+
+    console.error(erro);
+
+    await bot.sendMessage(
+        chatId,
+        "❌ Não consegui baixar essa imagem."
+    );
+
+}
+
+);}
