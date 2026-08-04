@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import hashlib
 import io
 import logging
@@ -11,10 +12,14 @@ import re
 from contextlib import asynccontextmanager
 from typing import Optional
 
+# Precisa ser definido antes do onnxruntime carregar, para reduzir uso de RAM/threads.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("ORT_NUM_THREADS", "1")
+
 import httpx
 from fastapi import FastAPI, Request, Response, status
 from PIL import Image, UnidentifiedImageError
-from rembg import remove as rembg_remove
+from rembg import new_session, remove as rembg_remove
 from telegram import InputFile, Update
 from telegram.constants import ChatAction
 from telegram.ext import (
@@ -55,9 +60,12 @@ WEBHOOK_SECRET = hashlib.sha256(TELEGRAM_BOT_TOKEN.encode()).hexdigest()
 WEBHOOK_URL = f"{RENDER_EXTERNAL_URL.rstrip('/')}{WEBHOOK_PATH}"
 
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
-MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
+MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024  # 8 MB — necessário no plano Free (512 MB RAM)
+MAX_IMAGE_DIMENSION = 1280  # reduz o pico de memória durante a inferência do onnxruntime
 DOWNLOAD_TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0)
 URL_PATTERN = re.compile(r"https?://\S+")
+
+REMBG_SESSION = new_session("u2netp")  # modelo leve, ideal para pouca RAM
 
 http_client: Optional[httpx.AsyncClient] = None
 
@@ -96,12 +104,12 @@ async def download_image(url: str) -> bytes:
             )
             declared_length = response.headers.get("content-length")
             if declared_length and int(declared_length) > MAX_IMAGE_SIZE_BYTES:
-                raise ImageDownloadError("A imagem excede o limite de 20 MB.")
+                raise ImageDownloadError("A imagem excede o limite de 8 MB.")
 
             async for chunk in response.aiter_bytes():
                 chunks.extend(chunk)
                 if len(chunks) > MAX_IMAGE_SIZE_BYTES:
-                    raise ImageDownloadError("A imagem excede o limite de 20 MB.")
+                    raise ImageDownloadError("A imagem excede o limite de 8 MB.")
 
     except httpx.ConnectTimeout as exc:
         raise ImageDownloadError("Tempo esgotado ao conectar ao servidor da imagem.") from exc
@@ -136,11 +144,20 @@ def _remove_background_sync(image_bytes: bytes) -> bytes:
         original.load()
         source = original.convert("RGBA")
 
-    result = rembg_remove(source)
+    if max(source.size) > MAX_IMAGE_DIMENSION:
+        source.thumbnail((MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION), Image.LANCZOS)
+
+    result = rembg_remove(source, session=REMBG_SESSION)
+    source.close()
 
     buffer = io.BytesIO()
     result.save(buffer, format="PNG", optimize=True)
-    return buffer.getvalue()
+    result.close()
+    output_bytes = buffer.getvalue()
+    buffer.close()
+
+    gc.collect()
+    return output_bytes
 
 
 async def remove_background(image_bytes: bytes) -> bytes:
